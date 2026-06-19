@@ -3,6 +3,7 @@ from core.event_bus import EventBus
 from core.world import World
 from systems.input_system import InputSystem
 from systems.movement_system import MovementSystem
+from systems.render_system import RenderSystem
 from level_loader import LevelLoader
 
 WINDOW_W = 1280
@@ -16,14 +17,16 @@ class Game(pyglet.window.Window):
         self.bus = EventBus()
         self.world = World()
 
+        self.render_system = RenderSystem(self.world, self)
+
         self.loader = LevelLoader(self.world, self.bus)
         self.loader.load("levels/level_1.tmx")
 
+        self.render_system.load_tilemap(self.loader.tilemap)
+
         spawn = self.loader.get_spawn()
         player = self.world.create_entity()
-        self.world.add_component(player, "Position", {
-            "x": spawn["x"], "y": spawn["y"]
-        })
+        self.world.add_component(player, "Position", {"x": spawn["x"], "y": spawn["y"]})
         self.world.add_component(player, "Velocity", {"x": 0.0, "y": 0.0})
         self.world.add_component(player, "Input", {})
         self.player_id = player
@@ -39,7 +42,7 @@ class Game(pyglet.window.Window):
         pyglet.clock.schedule_interval(self.on_update, 1 / 60)
 
     def _on_level_loaded(self, data):
-        print(f"уровень загружен: {data['path']}")
+        self.render_system.load_tilemap(self.loader.tilemap)
 
     def on_update(self, dt):
         self.input_system.update(dt)
@@ -47,9 +50,15 @@ class Game(pyglet.window.Window):
 
     def on_draw(self):
         self.clear()
+
         pos = self.world.get_component(self.player_id, "Position")
+        cam_x = pos["x"] - WINDOW_W / 2
+        cam_y = pos["y"] - WINDOW_H / 2
+
+        self.render_system.draw(cam_x, cam_y)
+
         pyglet.shapes.Rectangle(
-            pos["x"] - 16, pos["y"] - 16, 32, 32,
+            WINDOW_W / 2 - 16, WINDOW_H / 2 - 16, 32, 32,
             color=(120, 200, 120)
         ).draw()
 
