@@ -4,6 +4,7 @@ from core.world import World
 from systems.input_system import InputSystem
 from systems.collision_system import CollisionSystem
 from systems.render_system import RenderSystem
+from systems.sprite_stack import SpriteStack
 from level_loader import LevelLoader
 
 WINDOW_W = 1280
@@ -30,6 +31,14 @@ class Game(pyglet.window.Window):
         self.world.add_component(player, "Input", {})
         self.player_id = player
 
+        self.player_sprite = SpriteStack(
+            image_path="assets/sprite_stacking/player/player.png",
+            slice_w=32,
+            slice_h=32,
+            scale=1.0,
+            spread=1.0
+        )
+
         self.keys = pyglet.window.key.KeyStateHandler()
         self.push_handlers(self.keys)
 
@@ -51,11 +60,8 @@ class Game(pyglet.window.Window):
         self.clear()
         self.render_system.draw()
 
-        pyglet.shapes.Rectangle(
-            self.world.get_component(self.player_id, "Position")["x"] - 16,
-            self.world.get_component(self.player_id, "Position")["y"] - 16,
-            32, 32, color=(120, 200, 120)
-        ).draw()
+        pos = self.world.get_component(self.player_id, "Position")
+        self.player_sprite.draw(pos["x"], pos["y"])
 
     def on_key_press(self, symbol, modifiers):
         if symbol == pyglet.window.key.ESCAPE:
