@@ -92,17 +92,20 @@ def resolve_hit(attacker_arm, defender_arm):
             defender_arm.block()
 
 
-def in_attack_range(attacker_pos, attacker_angle, target_pos, arm):
-    dx = target_pos["x"] - attacker_pos["x"]
-    dy = target_pos["y"] - attacker_pos["y"]
-    dist = math.sqrt(dx * dx + dy * dy)
-
+def in_attack_range(attacker_pos, attacker_angle, target_pos, arm, target_hw=16, target_hh=16):
     if arm.attack == THRUST:
         radius = arm.weapon.thrust_radius
         angle  = arm.weapon.thrust_angle
     else:
         radius = arm.weapon.swing_radius
         angle  = arm.weapon.swing_angle
+
+    nearest_x = max(target_pos["x"] - target_hw, min(attacker_pos["x"], target_pos["x"] + target_hw))
+    nearest_y = max(target_pos["y"] - target_hh, min(attacker_pos["y"], target_pos["y"] + target_hh))
+
+    dx = nearest_x - attacker_pos["x"]
+    dy = nearest_y - attacker_pos["y"]
+    dist = math.sqrt(dx * dx + dy * dy)
 
     if dist > radius:
         return False
