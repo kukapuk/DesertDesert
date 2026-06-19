@@ -3,6 +3,7 @@ from core.event_bus import EventBus
 from core.world import World
 from systems.input_system import InputSystem
 from systems.movement_system import MovementSystem
+from systems.collision_system import CollisionSystem
 from systems.render_system import RenderSystem
 from systems.camera import Camera
 from level_loader import LevelLoader
@@ -18,7 +19,7 @@ class Game(pyglet.window.Window):
         self.bus = EventBus()
         self.world = World()
 
-        self.camera = Camera(WINDOW_W, WINDOW_H, smoothing=5.0)
+        self.camera = Camera(WINDOW_W, WINDOW_H, smoothing=8.0)
         self.render_system = RenderSystem(self.world, self)
 
         self.loader = LevelLoader(self.world, self.bus)
@@ -40,6 +41,7 @@ class Game(pyglet.window.Window):
 
         self.input_system = InputSystem(self.world, self.bus, self.keys)
         self.movement_system = MovementSystem(self.world)
+        self.collision_system = CollisionSystem(self.world, self.loader)
 
         self.bus.subscribe("level_loaded", self._on_level_loaded)
 
@@ -50,7 +52,7 @@ class Game(pyglet.window.Window):
 
     def on_update(self, dt):
         self.input_system.update(dt)
-        self.movement_system.update(dt)
+        self.collision_system.update(dt)
 
         pos = self.world.get_component(self.player_id, "Position")
         self.camera.update(pos["x"], pos["y"], dt)

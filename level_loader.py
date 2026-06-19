@@ -7,21 +7,46 @@ class LevelLoader:
         self.world = world
         self.bus = bus
         self.tilemap = None
-        self.spawn_point = {"x": 100.0, "y": 100.0}  # fallback
+        self.spawn_point = {"x": 100.0, "y": 100.0}
+        self.wall_tiles = set()
+        self.tile_width = 32
+        self.tile_height = 32
+        self.map_height = 0
 
         self.bus.subscribe("level_exit", self._on_level_exit)
 
     def load(self, path: str, keep_entities: list = None):
         full_path = Path(path)
         self.tilemap = parse_map(full_path)
+        self.tile_width = self.tilemap.tile_size.width
+        self.tile_height = self.tilemap.tile_size.height
+        self.map_height = self.tilemap.map_size.height
+        self.wall_tiles = set()
 
         self.world.clear_level(keep=keep_entities or [])
 
         for layer in self.tilemap.layers:
             if isinstance(layer, pytiled_parser.ObjectLayer):
                 self._load_objects(layer)
+            elif isinstance(layer, pytiled_parser.TileLayer):
+                if layer.name == "walls":
+                    self._load_walls(layer)
 
         self.bus.publish("level_loaded", {"path": path})
+
+    def _load_walls(self, layer):
+        for y, row in enumerate(layer.data):
+            for x, gid in enumerate(row):
+                if gid != 0:
+                    self.wall_tiles.add((x, y))
+
+    def is_wall(self, tile_x, tile_y):
+        return (tile_x, tile_y) in self.wall_tiles
+
+    def world_to_tile(self, wx, wy):
+        tx = int(wx // self.tile_width)
+        ty = int(self.map_height - 1 - wy // self.tile_height)
+        return tx, ty
 
     def _load_objects(self, layer):
         for obj in layer.tiled_objects:
