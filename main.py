@@ -9,6 +9,9 @@ from systems.sprite_stack import SpriteStack
 from systems.combat_system import CombatSystem, ArmState
 from level_loader import LevelLoader
 from systems.weapon import SWORD, DAGGER, AXE, HATCHET
+from systems.attack_vfx import AttackVFX
+from systems.weapon import SWORD, DAGGER
+from systems.combat_system import ArmState, SWING_HIGH, SWING_LOW, THRUST
 
 WINDOW_W = 1280
 WINDOW_H = 720
@@ -20,6 +23,7 @@ class Game(pyglet.window.Window):
 
         self.bus   = EventBus()
         self.world = World()
+        self.vfx = AttackVFX()
 
         self.render_system = RenderSystem(self.world, self)
 
@@ -84,6 +88,27 @@ class Game(pyglet.window.Window):
     def _on_player_attack(self, data):
         self.combat_system.attack(data["eid"], data["hand"], data["attack"])
 
+        pos    = self.world.get_component(self.player_id, "Position")
+        rot    = self.world.get_component(self.player_id, "Rotation")
+        combat = self.world.get_component(self.player_id, "Combat")
+        arm    = combat[data["hand"]]
+        angle  = -rot["angle"]
+
+        if data["attack"] == THRUST:
+            self.vfx.spawn_thrust(
+                pos["x"], pos["y"],
+                angle,
+                arm.weapon.thrust_radius,
+            )
+        else:
+            self.vfx.spawn_swing(
+                pos["x"], pos["y"],
+                angle,
+                arm.weapon.swing_radius,
+                arm.weapon.swing_angle,
+                data["attack"],
+            )
+
     def _on_entity_hit(self, data):
         print(f"hit eid={data['eid']} dmg={data['damage']} type={data['attack']}")
 
@@ -94,6 +119,7 @@ class Game(pyglet.window.Window):
         self.input_system.update(dt)
         self.collision_system.update(dt)
         self.combat_system.update(dt)
+        self.vfx.update(dt)
 
         pos = self.world.get_component(self.player_id, "Position")
         rot = self.world.get_component(self.player_id, "Rotation")
@@ -114,6 +140,8 @@ class Game(pyglet.window.Window):
             dpos["x"] - 16, dpos["y"] - 16, 32, 32,
             color=(200, 80, 80)
         ).draw()
+
+        self.vfx.draw()
 
     def on_mouse_motion(self, x, y, dx, dy):
         self.mouse_x = x
