@@ -1,4 +1,5 @@
 import pyglet
+import math
 from core.event_bus import EventBus
 from core.world import World
 from systems.input_system import InputSystem
@@ -29,6 +30,7 @@ class Game(pyglet.window.Window):
         self.world.add_component(player, "Position", {"x": spawn["x"], "y": spawn["y"]})
         self.world.add_component(player, "Velocity", {"x": 0.0, "y": 0.0})
         self.world.add_component(player, "Input", {})
+        self.world.add_component(player, "Rotation", {"angle": 0.0})
         self.player_id = player
 
         self.player_sprite = SpriteStack(
@@ -36,8 +38,11 @@ class Game(pyglet.window.Window):
             slice_w=32,
             slice_h=32,
             scale=1.0,
-            spread=1.0
+            spread=0.5
         )
+
+        self.mouse_x = WINDOW_W / 2
+        self.mouse_y = WINDOW_H / 2
 
         self.keys = pyglet.window.key.KeyStateHandler()
         self.push_handlers(self.keys)
@@ -56,12 +61,24 @@ class Game(pyglet.window.Window):
         self.input_system.update(dt)
         self.collision_system.update(dt)
 
+        pos = self.world.get_component(self.player_id, "Position")
+        rot = self.world.get_component(self.player_id, "Rotation")
+
+        dx = self.mouse_x - pos["x"]
+        dy = self.mouse_y - pos["y"]
+        rot["angle"] = -math.degrees(math.atan2(dy, dx))
+
     def on_draw(self):
         self.clear()
         self.render_system.draw()
 
         pos = self.world.get_component(self.player_id, "Position")
-        self.player_sprite.draw(pos["x"], pos["y"])
+        rot = self.world.get_component(self.player_id, "Rotation")
+        self.player_sprite.draw(pos["x"], pos["y"], angle=rot["angle"])
+
+    def on_mouse_motion(self, x, y, dx, dy):
+        self.mouse_x = x
+        self.mouse_y = y
 
     def on_key_press(self, symbol, modifiers):
         if symbol == pyglet.window.key.ESCAPE:
