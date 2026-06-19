@@ -38,7 +38,8 @@ class Game(pyglet.window.Window):
             slice_w=32,
             slice_h=32,
             scale=1.0,
-            spread=0.5
+            spread=0.65,
+            y_scale=1.0
         )
 
         self.mouse_x = WINDOW_W / 2

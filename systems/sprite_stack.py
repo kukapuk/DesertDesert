@@ -1,11 +1,12 @@
 import pyglet
 
 class SpriteStack:
-    def __init__(self, image_path, slice_w, slice_h, scale=1.0, spread=1.5):
+    def __init__(self, image_path, slice_w, slice_h, scale=1.0, spread=0.5, y_scale=0.65):
         self.slice_w = slice_w
         self.slice_h = slice_h
         self.scale = scale
         self.spread = spread
+        self.y_scale = y_scale
         self.slices = []
 
         source = pyglet.image.load(image_path)
@@ -30,7 +31,7 @@ class SpriteStack:
             sprite.x = x
             sprite.y = y + i * self.spread * self.scale
             sprite.scale_x = self.scale
-            sprite.scale_y = self.scale * 0.5
+            sprite.scale_y = self.scale * self.y_scale
             sprite.rotation = angle
             sprite.draw()
             sprite.delete()
