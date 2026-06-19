@@ -6,6 +6,7 @@ from systems.input_system import InputSystem
 from systems.collision_system import CollisionSystem
 from systems.render_system import RenderSystem
 from systems.sprite_stack import SpriteStack
+from systems.combat_system import CombatSystem, ArmState
 from level_loader import LevelLoader
 
 WINDOW_W = 1280
@@ -16,7 +17,7 @@ class Game(pyglet.window.Window):
     def __init__(self):
         super().__init__(WINDOW_W, WINDOW_H, caption=TITLE)
 
-        self.bus = EventBus()
+        self.bus   = EventBus()
         self.world = World()
 
         self.render_system = RenderSystem(self.world, self)
@@ -25,12 +26,17 @@ class Game(pyglet.window.Window):
         self.loader.load("levels/level_1.tmx")
         self.render_system.load_tilemap(self.loader.tilemap)
 
-        spawn = self.loader.get_spawn()
+        spawn  = self.loader.get_spawn()
         player = self.world.create_entity()
         self.world.add_component(player, "Position", {"x": spawn["x"], "y": spawn["y"]})
         self.world.add_component(player, "Velocity", {"x": 0.0, "y": 0.0})
-        self.world.add_component(player, "Input", {})
+        self.world.add_component(player, "Input",    {})
         self.world.add_component(player, "Rotation", {"angle": 0.0})
+        self.world.add_component(player, "Health",   {"hp": 100})
+        self.world.add_component(player, "Combat",   {
+            "right": ArmState(),
+            "left":  ArmState(),
+        })
         self.player_id = player
 
         self.player_sprite = SpriteStack(
@@ -42,31 +48,55 @@ class Game(pyglet.window.Window):
             y_scale=1.0
         )
 
+
+        dummy = self.world.create_entity()
+        self.world.add_component(dummy, "Position", {"x": spawn["x"] + 100, "y": spawn["y"]})
+        self.world.add_component(dummy, "Health",   {"hp": 100})
+        self.world.add_component(dummy, "Combat",   {
+            "right": ArmState(),
+            "left":  ArmState(),
+        })
+        self.dummy_id = dummy
+
+
         self.mouse_x = WINDOW_W / 2
         self.mouse_y = WINDOW_H / 2
 
         self.keys = pyglet.window.key.KeyStateHandler()
         self.push_handlers(self.keys)
 
-        self.input_system = InputSystem(self.world, self.bus, self.keys)
+        self.input_system   = InputSystem(self.world, self.bus, self.keys)
         self.collision_system = CollisionSystem(self.world, self.loader)
+        self.combat_system  = CombatSystem(self.world, self.bus)
 
-        self.bus.subscribe("level_loaded", self._on_level_loaded)
+        self.bus.subscribe("level_loaded",   self._on_level_loaded)
+        self.bus.subscribe("player_attack",  self._on_player_attack)
+        self.bus.subscribe("entity_hit",     self._on_entity_hit)
+        self.bus.subscribe("entity_died",    self._on_entity_died)
 
         pyglet.clock.schedule_interval(self.on_update, 1 / 60)
 
     def _on_level_loaded(self, data):
         self.render_system.load_tilemap(self.loader.tilemap)
 
+    def _on_player_attack(self, data):
+        self.combat_system.attack(data["eid"], data["hand"], data["attack"])
+
+    def _on_entity_hit(self, data):
+        print(f"hit eid={data['eid']} dmg={data['damage']} type={data['attack']}")
+
+    def _on_entity_died(self, data):
+        print(f"died eid={data['eid']}")
+
     def on_update(self, dt):
         self.input_system.update(dt)
         self.collision_system.update(dt)
+        self.combat_system.update(dt)
 
         pos = self.world.get_component(self.player_id, "Position")
         rot = self.world.get_component(self.player_id, "Rotation")
-
-        dx = self.mouse_x - pos["x"]
-        dy = self.mouse_y - pos["y"]
+        dx  = self.mouse_x - pos["x"]
+        dy  = self.mouse_y - pos["y"]
         rot["angle"] = -math.degrees(math.atan2(dy, dx))
 
     def on_draw(self):
@@ -77,9 +107,18 @@ class Game(pyglet.window.Window):
         rot = self.world.get_component(self.player_id, "Rotation")
         self.player_sprite.draw(pos["x"], pos["y"], angle=rot["angle"])
 
+        dpos = self.world.get_component(self.dummy_id, "Position")
+        pyglet.shapes.Rectangle(
+            dpos["x"] - 16, dpos["y"] - 16, 32, 32,
+            color=(200, 80, 80)
+        ).draw()
+
     def on_mouse_motion(self, x, y, dx, dy):
         self.mouse_x = x
         self.mouse_y = y
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        self.input_system.on_mouse_press(button, modifiers)
 
     def on_key_press(self, symbol, modifiers):
         if symbol == pyglet.window.key.ESCAPE:
