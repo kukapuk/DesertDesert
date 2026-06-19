@@ -4,6 +4,7 @@ from core.world import World
 from systems.input_system import InputSystem
 from systems.movement_system import MovementSystem
 from systems.render_system import RenderSystem
+from systems.camera import Camera
 from level_loader import LevelLoader
 
 WINDOW_W = 1280
@@ -17,11 +18,11 @@ class Game(pyglet.window.Window):
         self.bus = EventBus()
         self.world = World()
 
+        self.camera = Camera(WINDOW_W, WINDOW_H, smoothing=5.0)
         self.render_system = RenderSystem(self.world, self)
 
         self.loader = LevelLoader(self.world, self.bus)
         self.loader.load("levels/level_1.tmx")
-
         self.render_system.load_tilemap(self.loader.tilemap)
 
         spawn = self.loader.get_spawn()
@@ -30,6 +31,9 @@ class Game(pyglet.window.Window):
         self.world.add_component(player, "Velocity", {"x": 0.0, "y": 0.0})
         self.world.add_component(player, "Input", {})
         self.player_id = player
+
+        self.camera.x = spawn["x"] - WINDOW_W / 2
+        self.camera.y = spawn["y"] - WINDOW_H / 2
 
         self.keys = pyglet.window.key.KeyStateHandler()
         self.push_handlers(self.keys)
@@ -48,14 +52,12 @@ class Game(pyglet.window.Window):
         self.input_system.update(dt)
         self.movement_system.update(dt)
 
+        pos = self.world.get_component(self.player_id, "Position")
+        self.camera.update(pos["x"], pos["y"], dt)
+
     def on_draw(self):
         self.clear()
-
-        pos = self.world.get_component(self.player_id, "Position")
-        cam_x = pos["x"] - WINDOW_W / 2
-        cam_y = pos["y"] - WINDOW_H / 2
-
-        self.render_system.draw(cam_x, cam_y)
+        self.render_system.draw(self.camera.x, self.camera.y)
 
         pyglet.shapes.Rectangle(
             WINDOW_W / 2 - 16, WINDOW_H / 2 - 16, 32, 32,
