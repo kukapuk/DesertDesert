@@ -1,6 +1,8 @@
 import pyglet
 from core.event_bus import EventBus
 from core.world import World
+from systems.input_system import InputSystem
+from systems.movement_system import MovementSystem
 
 WINDOW_W = 1280
 WINDOW_H = 720
@@ -9,7 +11,7 @@ TITLE = "DesertDesert"
 class Game(pyglet.window.Window):
     def __init__(self):
         super().__init__(WINDOW_W, WINDOW_H, caption=TITLE)
-        
+
         self.bus = EventBus()
         self.world = World()
 
@@ -22,27 +24,24 @@ class Game(pyglet.window.Window):
         self.keys = pyglet.window.key.KeyStateHandler()
         self.push_handlers(self.keys)
 
+        self.input_system = InputSystem(self.world, self.bus, self.keys)
+        self.movement_system = MovementSystem(self.world)
+
+        self.bus.subscribe("player_moving", self._on_player_moving)
+
         pyglet.clock.schedule_interval(self.on_update, 1 / 60)
 
+    def _on_player_moving(self, data):
+        if data["moving"]:
+            print(f"player moving → vx={data['vx']} vy={data['vy']}")
+
     def on_update(self, dt):
-        pos = self.world.get_component(self.player_id, "Position")
-        vel = self.world.get_component(self.player_id, "Velocity")
-
-        speed = 200
-        vel["x"] = 0
-        vel["y"] = 0
-        if self.keys[pyglet.window.key.W]: vel["y"] =  speed
-        if self.keys[pyglet.window.key.S]: vel["y"] = -speed
-        if self.keys[pyglet.window.key.A]: vel["x"] = -speed
-        if self.keys[pyglet.window.key.D]: vel["x"] =  speed
-
-        pos["x"] += vel["x"] * dt
-        pos["y"] += vel["y"] * dt
+        self.input_system.update(dt)
+        self.movement_system.update(dt)
 
     def on_draw(self):
         self.clear()
         pos = self.world.get_component(self.player_id, "Position")
-        # временно рисуем квадрат вместо спрайта
         pyglet.shapes.Rectangle(
             pos["x"] - 16, pos["y"] - 16, 32, 32,
             color=(120, 200, 120)
