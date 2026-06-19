@@ -1,4 +1,5 @@
 import math
+from systems.weapon import WeaponData, SWORD
 
 SWING_HIGH = "swing_high"
 SWING_LOW  = "swing_low"
@@ -10,19 +11,13 @@ ACTIVE   = "active"
 RECOVERY = "recovery"
 DELAY    = "delay"
 
-WINDUP_TIME   = 0.15
 ACTIVE_TIME   = 0.08
 RECOVERY_TIME = 0.20
 DELAY_TIME    = 0.30
 
-WEAPON_REACH = {
-    SWING_HIGH: {"radius": 60, "angle": 110},
-    SWING_LOW:  {"radius": 60, "angle": 110},
-    THRUST:     {"radius": 80, "angle": 40},
-}
-
 class ArmState:
-    def __init__(self):
+    def __init__(self, weapon: WeaponData = None):
+        self.weapon     = weapon or SWORD
         self.phase      = IDLE
         self.attack     = None
         self.timer      = 0.0
@@ -62,7 +57,7 @@ class ArmState:
             return False
         self.phase      = WINDUP
         self.attack     = attack_type
-        self.timer      = WINDUP_TIME
+        self.timer      = self.weapon.windup_time
         self.blocked    = False
         self.hit_landed = False
         return True
@@ -97,20 +92,43 @@ def resolve_hit(attacker_arm, defender_arm):
             defender_arm.block()
 
 
-def in_attack_range(attacker_pos, attacker_angle, target_pos, attack_type):
+def in_attack_range(attacker_pos, attacker_angle, target_pos, arm):
     dx = target_pos["x"] - attacker_pos["x"]
     dy = target_pos["y"] - attacker_pos["y"]
-
     dist = math.sqrt(dx * dx + dy * dy)
-    reach = WEAPON_REACH[attack_type]
 
-    if dist > reach["radius"]:
+    if arm.attack == THRUST:
+        radius = arm.weapon.thrust_radius
+        angle  = arm.weapon.thrust_angle
+    else:
+        radius = arm.weapon.swing_radius
+        angle  = arm.weapon.swing_angle
+
+    if dist > radius:
         return False
 
     angle_to_target = math.degrees(math.atan2(dy, dx))
     diff = (angle_to_target - attacker_angle + 180) % 360 - 180
 
-    return abs(diff) <= reach["angle"] / 2
+    return abs(diff) <= angle / 2
+
+
+def calc_damage(arm, target_armor):
+    w = arm.weapon
+
+    if arm.attack == THRUST:
+        base = w.thrust_dmg
+    else:
+        base = w.swing_dmg
+
+    armor = target_armor or {"value": 0, "type": "none"}
+
+    if armor["type"] == "plate":
+        dmg = base * w.pierce_mul - armor["value"]
+    else:
+        dmg = base * w.flesh_mul - armor["value"] * 0.5
+
+    return max(1, dmg)
 
 
 class CombatSystem:
@@ -142,32 +160,36 @@ class CombatSystem:
 
         for arm_a in (combat_a["right"], combat_a["left"]):
             if arm_a.is_active() and not arm_a.hit_landed and arm_a.attack:
-                if in_attack_range(pos_a, -angle_a, pos_b, arm_a.attack):
+                if in_attack_range(pos_a, -angle_a, pos_b, arm_a):
                     resolve_hit(arm_a, combat_b["right"])
                     resolve_hit(arm_a, combat_b["left"])
                     if not arm_a.blocked:
-                        self._apply_damage(eid_b, arm_a)
+                        armor = self.world.get_component(eid_b, "Armor")
+                        dmg   = calc_damage(arm_a, armor)
+                        self._apply_damage(eid_b, arm_a, dmg)
                         arm_a.hit_landed = True
 
         for arm_b in (combat_b["right"], combat_b["left"]):
             if arm_b.is_active() and not arm_b.hit_landed and arm_b.attack:
-                if in_attack_range(pos_b, -angle_b, pos_a, arm_b.attack):
+                if in_attack_range(pos_b, -angle_b, pos_a, arm_b):
                     resolve_hit(arm_b, combat_a["right"])
                     resolve_hit(arm_b, combat_a["left"])
                     if not arm_b.blocked:
-                        self._apply_damage(eid_a, arm_b)
+                        armor = self.world.get_component(eid_a, "Armor")
+                        dmg   = calc_damage(arm_b, armor)
+                        self._apply_damage(eid_a, arm_b, dmg)
                         arm_b.hit_landed = True
 
-    def _apply_damage(self, target_eid, arm):
+    def _apply_damage(self, target_eid, arm, dmg):
         health = self.world.get_component(target_eid, "Health")
         if health is None:
             return
 
-        dmg = 10
         self.bus.publish("entity_hit", {
             "eid":    target_eid,
             "damage": dmg,
             "attack": arm.attack,
+            "weapon": arm.weapon.name,
         })
 
         health["hp"] -= dmg

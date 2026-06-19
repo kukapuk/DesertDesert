@@ -8,6 +8,7 @@ from systems.render_system import RenderSystem
 from systems.sprite_stack import SpriteStack
 from systems.combat_system import CombatSystem, ArmState
 from level_loader import LevelLoader
+from systems.weapon import SWORD, DAGGER, AXE, HATCHET
 
 WINDOW_W = 1280
 WINDOW_H = 720
@@ -33,9 +34,9 @@ class Game(pyglet.window.Window):
         self.world.add_component(player, "Input",    {})
         self.world.add_component(player, "Rotation", {"angle": 0.0})
         self.world.add_component(player, "Health",   {"hp": 100})
-        self.world.add_component(player, "Combat",   {
-            "right": ArmState(),
-            "left":  ArmState(),
+        self.world.add_component(player, "Combat", {
+            "right": ArmState(weapon=SWORD),
+            "left":  ArmState(weapon=DAGGER),
         })
         self.player_id = player
 
@@ -52,10 +53,11 @@ class Game(pyglet.window.Window):
         dummy = self.world.create_entity()
         self.world.add_component(dummy, "Position", {"x": spawn["x"] + 100, "y": spawn["y"]})
         self.world.add_component(dummy, "Health",   {"hp": 100})
-        self.world.add_component(dummy, "Combat",   {
-            "right": ArmState(),
-            "left":  ArmState(),
+        self.world.add_component(dummy, "Combat", {
+            "right": ArmState(weapon=SWORD),
+            "left":  ArmState(weapon=SWORD),
         })
+        self.world.add_component(dummy, "Armor", {"value": 0, "type": "none"})
         self.dummy_id = dummy
 
 
