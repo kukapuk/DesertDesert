@@ -13,8 +13,8 @@ from systems.attack_vfx import AttackVFX
 from systems.weapon import SWORD, DAGGER
 from systems.combat_system import ArmState, SWING_HIGH, SWING_LOW, THRUST
 
-WINDOW_W = 1280
-WINDOW_H = 720
+WINDOW_W = 640
+WINDOW_H = 480
 TITLE = "DesertDesert"
 
 class Game(pyglet.window.Window):
